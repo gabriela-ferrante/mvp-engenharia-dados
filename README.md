@@ -156,7 +156,7 @@ O dataset TheLook eCommerce é composto por 7 tabelas relacionadas, representand
 
 ### Licença
 
-O TheLook eCommerce é um dataset **fictício**, criado pela equipe do Looker (adquirida pelo Google) para fins educacionais e de demonstração de produto, e distribuído publicamente através do **Google Cloud Public Dataset Program** no BigQuery (`bigquery-public-data.thelook_ecommerce`). Todos os dados — clientes, pedidos, produtos — são gerados programaticamente, não representando pessoas ou transações reais.
+O TheLook eCommerce é um dataset **fictício**, criado pela equipe do Looker (adquirida pelo Google) para fins educacionais e de demonstração de produto, e distribuído publicamente através do **Google Cloud Public Dataset Program** no BigQuery (`bigquery-public-data.thelook_ecommerce`). Todos os dados — clientes, pedidos, produtos — são gerados programaticamente, não representando pessoas ou transações reais. O uso segue os termos do Google Cloud Public Dataset Program; recomenda-se consultar a página oficial do dataset no Google Cloud Marketplace para os termos vigentes no momento da entrega.
 
 ---
 
@@ -173,13 +173,13 @@ A carga de dados foi feita em duas etapas, já que a fonte original (BigQuery) e
 
    Ao final, o script compacta os 7 CSVs num único `thelook_export.zip`, baixado do Cloud Shell direto para o computador local pelo menu **Download** (⋮ → Download).
 
-   ![alt text](image.png)
+   ![alt text](imagens/image.png)
 
 2. **Upload para o Databricks:** os 7 arquivos CSV (extraídos do zip) foram enviados para o Volume `ecommerce_mvp.bronze.raw_files` do Unity Catalog, através do Catalog Explorer (**Upload to this volume**).
 
 Script de extração disponível no GitHub em `scripts/export_all_tables.sh`. Notebook de referência para a ingestão: `notebooks/01_bronze_ingestao.sql` (também documentado no Guia da Pipeline, seção 7).
 
-![alt text](image-1.png)
+![alt text](imagens/image-1.png)
 
 ---
 
@@ -190,7 +190,7 @@ Script de extração disponível no GitHub em `scripts/export_all_tables.sh`. No
 A modelagem seguiu a **Arquitetura Medalhão** (Bronze → Silver → Gold):
 - **Bronze:** cópia fiel das 7 tabelas originais, sem nenhuma transformação, apenas com metadados de controle (`data_ingestao`, `fonte`).
 - **Silver:** dados limpos, tipados e renomeados para português, com regras de qualidade aplicadas (Seção 5).
-- **Gold:** modelo dimensional simplificado (fato + dimensões), mais tabelas analíticas específicas (`estoque_atual`, `giro_vendas_produto`, `kpis_mensais`, `ciclo_vida_cliente`, `base_crm`, `funil_conversao`) — divididas deliberadamente em várias tabelas menores em vez de uma única tabela consolidada.
+- **Gold:** modelo dimensional simplificado (fato + dimensões), mais tabelas analíticas específicas (`estoque_atual`, `giro_vendas_produto`, `kpis_mensais`, `ciclo_vida_cliente`, `base_crm`, `funil_conversao`) — divididas deliberadamente em várias tabelas menores em vez de uma única tabela consolidada, para permitir cruzamentos flexíveis em análises.
 
 ### Catálogo de Dados
 
@@ -291,8 +291,9 @@ A modelagem seguiu a **Arquitetura Medalhão** (Bronze → Silver → Gold):
 
 **Catálogo, schemas e tabelas:**
 
-![](image-2.png)
+![](imagens/image-2.png)
 
+---
 
 ## 4. Pipeline de Dados
 
@@ -307,7 +308,7 @@ A pipeline foi **ramificada em 6 notebooks**, um por responsabilidade, em vez de
 | `04_gold_modelagem` | Modelo dimensional + tabelas analíticas (KPIs, estoque, ciclo de vida, funil) |
 | `05_analise_final` | Consultas que respondem cada uma das 18 perguntas de negócio |
 
-A camada Gold foi deliberadamente dividida em várias tabelas menores e independentes (em vez de uma única tabela pré-agregada com tudo cruzado) para viabilizar um **Databricks Dashboard** que cruza essas tabelas visualmente (ex: `estoque_atual` + `giro_vendas_produto` para a análise de cobertura de estoque) — aproximando o resultado final de como um time de dados real disponibilizaria essas métricas para consumo por outras áreas.
+A camada Gold foi deliberadamente dividida em várias tabelas menores e independentes (em vez de uma única tabela pré-agregada com tudo cruzado) para viabilizar análises que cruzam tabelas  (ex: `estoque_atual` + `giro_vendas_produto` para a análise de cobertura de estoque) — aproximando o resultado final de como um time de dados real disponibilizaria essas métricas para consumo por outras áreas.
 
 Scripts disponíveis no GitHub em `notebooks/` (referenciar o link do seu repositório aqui).
 
@@ -321,7 +322,7 @@ CREATE SCHEMA IF NOT EXISTS ecommerce_mvp.gold;
 CREATE VOLUME IF NOT EXISTS ecommerce_mvp.bronze.raw_files;
 ```
 
-![Schema](image-3.png)
+![Schema](imagens/image-3.png)
 
 ### 4.2 Camada Bronze — ingestão do dado bruto (`01_bronze_ingestao`)
 
@@ -359,15 +360,17 @@ FROM read_files('/Volumes/ecommerce_mvp/bronze/raw_files/events.csv', format => 
 ```
 **Resultados**
 
-![Schema camada Bronze](image-4.png)
+![Schema camada Bronze](imagens/image-4.png)
 
-![distribution centers bronze](image-5.png)
+![distribution centers bronze](imagens/image-5.png)
 
-![events bronze](image-6.png)
+![events bronze](imagens/image-6.png)
 
-**O que foi feito:** ingestão bruta das 7 tabelas a partir dos CSVs no Volume, sem nenhuma limpeza, apenas adicionando duas colunas de controle (`data_ingestao`, `fonte`).
-**Por que foi feito:** preservar o dado exatamente como veio da origem (BigQuery), garantindo rastreabilidade — se algo der errado nas camadas seguintes, sempre dá para voltar ao dado bruto e conferir o que realmente chegou.
-**Impacto nos dados:** nenhum impacto no conteúdo; adiciona apenas metadados de auditoria (quando e de onde o dado veio).
+-**O que foi feito:** ingestão bruta das 7 tabelas a partir dos CSVs no Volume, sem nenhuma limpeza, apenas adicionando duas colunas de controle (`data_ingestao`, `fonte`).
+
+-**Por que foi feito:** preservar o dado exatamente como veio da origem (BigQuery), garantindo rastreabilidade — se algo der errado nas camadas seguintes, sempre dá para voltar ao dado bruto e conferir o que realmente chegou.
+
+-**Impacto nos dados:** nenhum impacto no conteúdo; adiciona apenas metadados de auditoria (quando e de onde o dado veio).
 
 ### 4.3 Camada Silver — limpeza e padronização (`03_silver_transformacao`)
 
@@ -476,16 +479,16 @@ ORDER BY data_evento;
 
 **Exemplos de Resultados**
 
-![Schema camada Silver](image-7.png)
+![Schema camada Silver](imagens/image-7.png)
 
-![distribution centers silver](image-17.png)
+![distribution centers silver](imagens/image-17.png)
 
-![events silver](image-18.png)
+![events silver](imagens/image-18.png)
 
 
-### 4.4 Camada Gold — modelo dimensional e tabelas para gráficos (`04_gold_modelagem`)
+### 4.4 Camada Gold — modelo dimensional e tabelas (`04_gold_modelagem`)
 
-A Gold não entrega tudo pré-cruzado numa única tabela: dimensões, fato de vendas e tabelas analíticas ficam separadas para permitir montar visualizações e cruzamentos flexíveis num Databricks Dashboard.
+A Gold não entrega tudo pré-cruzado numa única tabela: dimensões, fato de vendas e tabelas analíticas ficam separadas para permitir montar visualizações.
 
 
 
@@ -571,7 +574,7 @@ GROUP BY DATE_TRUNC('month', data_venda);
 ```
 
 - **O que foi feito:** agregação de `gold.fato_vendas` por mês, com receita, pedidos, ticket médio, clientes ativos e frequência média, arredondados para 2 casas decimais.
-- **Por que foi feito:** consolidar as métricas centrais de desempenho comercial numa única tabela pronta para consumo direto no dashboard.
+- **Por que foi feito:** consolidar as métricas centrais de desempenho comercial numa única tabela pronta.
 - **Impacto nos dados:** reduz de ~93 mil pedidos para uma linha por mês (~92 meses no período total) — tabela de resumo, não de detalhe.
 
 ```sql
@@ -640,11 +643,11 @@ GROUP BY id_sessao;
 
 **Exemplos Tabelas camada Gold**
 
-![Schema gold](image-16.png)
+![Schema gold](imagens/image-16.png)
 
-![base crm gold](image-19.png)
+![base crm gold](imagens/image-19.png)
 
-![cliente gold](image-20.png)
+![cliente gold](imagens/image-20.png)
 
 
 ## 5. Qualidade de Dados
@@ -703,11 +706,11 @@ FROM ecommerce_mvp.bronze.events;
 
 **Exemplos de Resultados:**
 
-![completude](image-13.png)
+![completude](imagens/image-13.png)
 
-![consistência](image-14.png)
+![consistência](imagens/image-14.png)
 
-![unicidade](image-15.png)
+![unicidade](imagens/image-15.png)
 
 ---
 
@@ -732,11 +735,11 @@ ORDER BY t.mes;
 ```
 Considerando apenas pedidos não cancelados/devolvidos, a loja acumula **136.178 itens vendidos**, gerando **US$ 8.088.564,35** em receita, distribuídos em **93.547 pedidos** de **66.048 clientes únicos**. O ticket médio geral é de **US$ 86,47** e cada cliente faz, em média, **1,42 pedidos**. O volume mensal mais recente mostra forte aceleração: setembro/2026 (mês parcial) já supera agosto/2026 inteiro (US$ 618 mil vs. US$ 359 mil), com crescimento mês a mês consistente ao longo de 2026 (de US$ 188 mil em fevereiro para os valores atuais). *A receita está em trajetória de crescimento acelerado nos meses mais recentes — vale investigar se isso reflete sazonalidade, uma campanha específica ou crescimento orgânico sustentado, para decidir se o ritmo de investimento em estoque e operação deve acompanhar esse ritmo.*
 
-![kpis gerais](image-21.png)
+![kpis gerais](imagens/image-21.png)
 
-![kpis mensais](image-28.png)
+![kpis mensais](imagens/image-28.png)
 
-![evolução receita](image-46.png)
+![evolução receita](imagens/image-46.png)
 
 **Pergunta 2 — Sazonalidade (mês e dia da semana)**
 ```sql
@@ -755,11 +758,11 @@ ORDER BY t.mes DESC LIMIT 15;
 ```
 A receita por dia da semana é bastante uniforme com sexta-feira tendo o maior volume de vendas. Já a sazonalidade mensal mostra crescimento consistente mês a mês em 2026. *Não há um "dia mais forte" para concentrar campanhas; o padrão relevante é o crescimento mensal, não semanal.*
 
-![por dia da semana](image-23.png)
+![por dia da semana](imagens/image-23.png)
 
-![gráfico por semana](image-47.png)
+![gráfico por semana](imagens/image-47.png)
 
-![tendência mensal](image-24.png)
+![tendência mensal](imagens/image-24.png)
 
 
 
@@ -784,13 +787,13 @@ ORDER BY pct_cancel_devol DESC;
 ```
 Juntos, pedidos "Cancelled" (15%) e "Returned" (10%) somam **25%** de todos os pedidos. Ao quebrar por categoria de produto, a taxa se mantém entre 25% e 26% de forma bastante homogênea — não há uma categoria clara concentrando o problema. *O cancelamento/devolução é um problema estrutural e geral do negócio (1 em cada 4 pedidos), não um problema pontual de categoria — a ação corretiva provavelmente deve mirar o processo de checkout/pagamento, política de devolução como um todo ou avaliação de qualidade como um todo, não um produto específico.*
 
-![Taxa geral](image-25.png)
+![Taxa geral](imagens/image-25.png)
 
-![gráfico status](image-48.png)
+![gráfico status](imagens/image-48.png)
 
-![Catgoria de produto](image-26.png)
+![Catgoria de produto](imagens/image-26.png)
 
-![gráfico por categoria](image-49.png)
+![gráfico por categoria](imagens/image-49.png)
 
 ### B. Mix de produtos e lucratividade
 
@@ -804,9 +807,9 @@ ORDER BY receita DESC;
 ```
 Por receita, as categorias líderes são **Outerwear & Coats** (US$ 990 mil, 6.813 unidades), **Jeans** (US$ 941 mil, 9.622 unidades) e **Sweaters** (US$ 636 mil). Jeans lidera em volume de unidades, mas Outerwear & Coats lidera em receita — sinal de ticket médio mais alto nessa categoria.
 
-![mix de produtos](image-27.png)
+![mix de produtos](imagens/image-27.png)
 
-![gráfico categoria de produtos](image-50.png)
+![gráfico categoria de produtos](imagens/image-50.png)
 
 **Pergunta 5 — Margem por categoria**
 ```sql
@@ -821,9 +824,9 @@ ORDER BY pct_margem DESC;
 ```
 As categorias com **maior percentual de margem** são **Blazers & Jackets** (62,1% de margem sobre a receita), **Skirts** (60,2%) e **Suits & Sport Coats** (59,8% de margem, com a maior margem em valor absoluto por unidade: US$ 76,69). *Blazers & Jackets e Suits & Sport Coats seriam bons candidatos a investimento em mídia/destaque, pois cada venda adicional carrega uma margem proporcionalmente maior do que a média do mix.*
 
-![margem](image-29.png)
+![margem](imagens/image-29.png)
 
-![gráfico margem](image-51.png)
+![gráfico margem](imagens/image-51.png)
 
 **Pergunta 6 — Desempenho por departamento (Men vs. Women)**
 ```sql
@@ -838,9 +841,9 @@ ORDER BY receita DESC;
 ```
 Os departamentos têm desempenho muito próximo: Men gera US$ 4.308.255 (51,8% de margem) contra US$ 3.777.716 de Women (52,0% de margem), com volume de unidades quase idêntico (67.186 vs. 67.738). *Não há uma divisão de negócio dominante — a estratégia comercial deve tratar os dois departamentos como igualmente relevantes.*
 
-![por departamento](image-30.png)
+![por departamento](imagens/image-30.png)
 
-![gráfico por departamento](image-52.png)
+![gráfico por departamento](imagens/image-52.png)
 
 ### C. Estoque e operação logística
 
@@ -858,7 +861,7 @@ LIMIT 20;
 ```
 Ao cruzar as vendas dos últimos 90 dias com o estoque atual, os produtos mais vendidos têm índice de giro (vendas 90d ÷ estoque atual) sempre **abaixo de 0,5** — ou seja, o estoque atual é o dobro (ou mais) da demanda recente. Não há risco aparente de ruptura entre os best-sellers; ao contrário, há sinal de estoque folgado mesmo nos produtos mais vendidos.*
 
-![estoque](image-32.png)
+![estoque](imagens/image-32.png)
 
 **Pergunta 8 — Produtos com estoque parado**
 ```sql
@@ -875,7 +878,7 @@ ORDER BY e.dias_medios_parado DESC;
 ```
 Este é o achado mais crítico do trabalho: **29.032 dos 29.043 produtos com estoque (99,96%)** têm unidades paradas há mais de 90 dias, com média geral de **1.229 dias (~3,4 anos)** parado. Os casos mais extremos passam de 2.400 dias parados. *Interpretação: praticamente todo o estoque da loja está "velho" em relação à data atual — isso é coerente com um dataset gerado continuamente desde 2019 sem giro proporcional de baixa de estoque, sinal de alarme de capital parado em nível de todo o catálogo, não apenas de produtos pontuais.*
 
-![estoque parado](image-33.png)
+![estoque parado](imagens/image-33.png)
 
 **Pergunta 9 — Tempo médio de entrega (geral e por centro de distribuição)**
 ```sql
@@ -897,9 +900,9 @@ ORDER BY dias_medios_entrega DESC;
 ```
 O tempo médio entre criação do pedido e entrega é de **4,0 dias**, e esse valor é **idêntico (4,0 dias) em todos os 10 centros de distribuição** analisados. *A operação logística está padronizada — não há um centro de distribuição "gargalo" a ser priorizado para otimização de prazo.*
 
-![tempo de entrega](image-34.png)
+![tempo de entrega](imagens/image-34.png)
 
-![gráfico tempo de entrega](image-53.png)
+![gráfico tempo de entrega](imagens/image-53.png)
 
 **Pergunta 10 — Centro de distribuição x taxa de cancelamento**
 ```sql
@@ -916,9 +919,9 @@ ORDER BY pct_cancel_devol DESC;
 ```
 A taxa de cancelamento/devolução por centro de distribuição varia pouco, entre 26,6% e 25,3% — sem um centro claramente pior que os demais. *Assim como no tempo de entrega, não há evidência de que a origem logística explique parte relevante do cancelamento — a causa provavelmente está em outro fator (ex: processo de pagamento, qualidade do produto).*
 
-![devolução por centro de distribuição](image-35.png)
+![devolução por centro de distribuição](imagens/image-35.png)
 
-![gráfico devolução por centro de distribuição](image-54.png)
+![gráfico devolução por centro de distribuição](imagens/image-54.png)
 
 ### D. CRM e ciclo de vida do cliente
 
@@ -934,7 +937,7 @@ WHERE mes_anterior IS NOT NULL;
 ```
 Entre clientes que compraram mais de uma vez, o tempo médio até a próxima compra é de **13,1 meses** — pouco mais de um ano. *O ciclo de recompra natural é longo; uma campanha de reativação disparada cedo demais (ex: em 2 meses) provavelmente terá baixa efetividade, já que boa parte da base simplesmente ainda não estaria "no tempo" de comprar de novo. Ideal ter uma campanha que atinge os clientes perto do prazo e 13 meses.*
 
-![ciclo de vida](image-37.png)
+![ciclo de vida](imagens/image-37.png)
 
 **Pergunta 12 — Distribuição novo/retido/reativado por mês**
 ```sql
@@ -955,9 +958,9 @@ ORDER BY qtd DESC;
 ```
 Das observações mensais de clientes, **71,2% são "Novo"**, **22,1% são "Reativado"** e apenas **6,7% são "Retido"**. *A retenção de curto prazo (compra novamente em até 2 meses) é rara — a maior parte da receita recorrente vem de clientes "reativados" após um hiato, reforçando o achado da pergunta 11 de que o ciclo de recompra é naturalmente longo.*
 
-![tipo de cliente](image-38.png)
+![tipo de cliente](imagens/image-38.png)
 
-![gráfico tipo de cliente](image-55.png)
+![gráfico tipo de cliente](imagens/image-55.png)
 
 **Pergunta 13 — Base de clientes para CRM**
 ```sql
@@ -971,7 +974,7 @@ SELECT * FROM ecommerce_mvp.gold.base_crm WHERE segmento_crm = 'Alvo de reativa�
 ```
 A segmentação identificou **12.106 clientes "Alvo de reativação"** (mais de 180 dias sem comprar, com histórico de mais de 1 pedido) com receita histórica média de **US$ 200,82**, e **2.713 "Clientes recorrentes de valor"** (3+ pedidos) com receita média de **US$ 283,97** — o segmento de maior valor por cliente, ainda que o menor em quantidade. *O segmento "Alvo de reativação" é o mais numeroso e representa a maior oportunidade agregada de receita recuperável via CRM.*
 
-![base de clientes](image-39.png)
+![base de clientes](imagens/image-39.png)
 
 ### E. Aquisição e perfil de clientes
 
@@ -989,9 +992,9 @@ ORDER BY clientes DESC;
 ```
 **Search** domina a aquisição de clientes (70% da base, 69.926 clientes), seguido por **Organic** (14,9%). A receita média por cliente, porém, é bastante uniforme entre canais (US$ 80,36 a US$ 85,06), com **Display** ligeiramente à frente (US$ 85,06) apesar de trazer o menor volume (4,1% da base).
 
-![canal](image-40.png)
+![canal](imagens/image-40.png)
 
-![gráfico canal](image-56.png)
+![gráfico canal](imagens/image-56.png)
 
 **Pergunta 15 — Distribuição geográfica da receita**
 ```sql
@@ -1004,9 +1007,9 @@ ORDER BY receita DESC;
 ```
 A receita está concentrada em poucos países entre os 16 atendidos: **China** lidera (US$ 2,69M, 22.166 clientes), seguida por **Estados Unidos** (US$ 1,82M) e **Brasil** (US$ 1,18M) Mais da metade da receita vem dos 3 maiores mercados; os demais 13 países representam uma cauda longa com potencial de crescimento ainda pouco explorado.*
 
-![paises](image-41.png)
+![paises](imagens/image-41.png)
 
-![gráfico países](image-57.png)
+![gráfico países](imagens/image-57.png)
 
 **Pergunta 16 — Perfil demográfico x categorias (gênero e faixa etária)**
 ```sql
@@ -1030,11 +1033,11 @@ ORDER BY faixa_etaria, v.departamento;
 ```
 Por gênero, a diferença é marcante — mulheres compram principalmente **Intimates** (10.271 unidades, muito à frente da 2ª colocada), enquanto homens tem todas as categorias em volumes mais equilibrados entre si. Já por **faixa etária**, a distribuição entre departamentos Men/Women é praticamente idêntica em todas as faixas (12–24, 25–39, 40–54, 55+). *Gênero é uma variável relevante para segmentação de campanhas de produto; idade, isoladamente, não é.*
 
-![genêro](image-43.png)
+![genêro](imagens/image-43.png)
 
-![por gênero](image-58.png)
+![por gênero](imagens/image-58.png)
 
-![faixa etaria](image-42.png)
+![faixa etaria](imagens/image-42.png)
 
 
 ### F. Funil de conversão
@@ -1053,9 +1056,9 @@ FROM ecommerce_mvp.gold.funil_conversao;
 ```
 De **681.183 sessões** que visualizaram algum produto, **63,2%** adicionaram algo ao carrinho, e destas, **41,9%** finalizaram a compra — uma conversão geral de **26,5%** de visualização de produto até compra. *A maior perda do funil está entre "adicionar ao carrinho" e "finalizar a compra" (58,1% de abandono nessa etapa), sugerindo que o esforço de otimização deveria focar no processo de checkout/pagamento, não na página de produto.*
 
-![funil](image-44.png)
+![funil](imagens/image-44.png)
 
-![funil](image-59.png)
+![funil](imagens/image-59.png)
 
 **Pergunta 18 — Conversão do funil por canal de origem**
 ```sql
@@ -1071,9 +1074,9 @@ ORDER BY pct_conversao DESC;
 ```
 A taxa de conversão é praticamente **idêntica entre canais**  uma variação de apenas 0,2 ponto percentual entre o melhor e o pior canal. *Diferente da pergunta 14 (onde o valor por cliente variava um pouco por canal), aqui a eficiência de conversão dentro da sessão é praticamente igual — o que diferencia os canais é volume de tráfego trazido, não a qualidade da conversão.*
 
-![funil por canal](image-45.png)
+![funil por canal](imagens/image-45.png)
 
-![gráfico funil por canal](image-60.png)
+![gráfico funil por canal](imagens/image-60.png)
 
 ### Discussão geral
 
@@ -1119,7 +1122,7 @@ Nenhuma dessas conclusões pode ser cruzada com **satisfação do cliente** (Per
 
 ## 7. Autoavaliação
 
-**Objetivos atingidos:** das 19 perguntas formuladas na etapa de Objetivo, 18 foram respondidas com dados concretos extraídos do dataset, cobrindo os 6 blocos temáticos propostos (KPIs, mix de produtos, estoque, CRM, aquisição e funil de conversão). O objetivo de construir um pipeline completo Bronze → Silver → Gold, com catálogo de dados documentado também foi atingido.
+**Objetivos atingidos:** das 19 perguntas formuladas na etapa de Objetivo, 18 foram respondidas com dados concretos extraídos do dataset, cobrindo os 6 blocos temáticos propostos (KPIs, mix de produtos, estoque, CRM, aquisição e funil de conversão). O objetivo de construir um pipeline completo Bronze → Silver → Gold, com catálogo de dados documentado, também foi atingido.
 
 **Limitações:** A pergunta 19 (satisfação do cliente com base em avaliações) não pôde ser respondida, pois o TheLook eCommerce não disponibiliza uma tabela de reviews — apenas dados de pedidos, produtos, estoque e eventos de navegação.
 
